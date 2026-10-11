@@ -6,6 +6,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -46,9 +48,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var sensor: Sensor? = null
     private val _heading = mutableFloatStateOf(0f)
     private val _available = mutableStateOf(false)
+    private var lastSensorHeading: Float? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        )
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
@@ -69,13 +76,23 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         val values = FloatArray(9)
         val orientation = FloatArray(3)
-        if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+        val magneticHeading = if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(values, event.values)
             SensorManager.getOrientation(values, orientation)
-            _heading.floatValue = (Math.toDegrees(orientation[0].toDouble()).toFloat() + 360f) % 360f
+            (Math.toDegrees(orientation[0].toDouble()).toFloat() + 360f) % 360f
         } else {
-            _heading.floatValue = (event.values[0] + 360f) % 360f
+            (event.values[0] + 360f) % 360f
         }
+        val previous = lastSensorHeading
+        if (previous == null) {
+            _heading.floatValue = magneticHeading
+        } else {
+            var delta = magneticHeading - previous
+            if (delta > 180f) delta -= 360f
+            if (delta < -180f) delta += 360f
+            _heading.floatValue += delta
+        }
+        lastSensorHeading = magneticHeading
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -88,12 +105,16 @@ private fun CompassScreen(heading: Float, available: Boolean) {
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "compass-heading"
     )
-    val cardinal = cardinal(heading)
-    val degrees = heading.roundToInt().mod(360)
+    val displayHeading = ((heading % 360f) + 360f) % 360f
+    val cardinal = cardinal(displayHeading)
+    val degrees = displayHeading.roundToInt().mod(360)
 
     Surface(color = Paper, modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 26.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(24.dp))
@@ -129,16 +150,24 @@ private fun CompassScreen(heading: Float, available: Boolean) {
                     drawCircle(Brush.radialGradient(listOf(Color.White, Color(0xFFE8E8DF)), center, radius * 1.1f), radius * 1.1f)
                     drawCircle(Ink.copy(alpha = .08f), radius * 1.04f, center)
                     drawCircle(Brush.linearGradient(listOf(Forest, Ink)), radius, center)
+                    drawCircle(Gold.copy(alpha = .32f), radius * .965f, center, style = Stroke(1.dp.toPx()))
                     drawCircle(Color.White.copy(alpha = .08f), radius - 5.dp.toPx(), center, style = Stroke(1.dp.toPx()))
+                    drawCircle(Sage.copy(alpha = .14f), radius * .69f, center, style = Stroke(1.dp.toPx()))
                     rotate(-animatedHeading, center) {
                         for (i in 0 until 72) {
                             val angle = Math.toRadians((i * 5 - 90).toDouble())
                             val major = i % 6 == 0
-                            val r1 = radius * .88f
-                            val r2 = radius * if (major) .78f else .83f
+                            val medium = i % 2 == 0
+                            val r1 = radius * .89f
+                            val r2 = radius * when {
+                                major -> .77f
+                                medium -> .82f
+                                else -> .85f
+                            }
                             val start = Offset(center.x + kotlin.math.cos(angle).toFloat() * r1, center.y + kotlin.math.sin(angle).toFloat() * r1)
                             val end = Offset(center.x + kotlin.math.cos(angle).toFloat() * r2, center.y + kotlin.math.sin(angle).toFloat() * r2)
-                            drawLine(if (major) Gold.copy(alpha = .9f) else Sage.copy(alpha = .55f), start, end, if (major) 2.dp.toPx() else 1.dp.toPx())
+                            val tickColor = if (major) Gold else Sage.copy(alpha = if (medium) .72f else .48f)
+                            drawLine(tickColor, start, end, if (major) 2.dp.toPx() else 1.dp.toPx())
                         }
                         val north = Path().apply {
                             moveTo(center.x, center.y - radius * .67f)
