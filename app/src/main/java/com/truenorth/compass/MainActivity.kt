@@ -14,6 +14,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -340,7 +341,7 @@ private fun CompassScreen(
 private fun Readout(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, palette: CompassPalette) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(34.dp).clip(CircleShape).background(palette.iconBackground), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = palette.forest, modifier = Modifier.size(17.dp))
+            Icon(icon, null, tint = palette.ink, modifier = Modifier.size(17.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column {
