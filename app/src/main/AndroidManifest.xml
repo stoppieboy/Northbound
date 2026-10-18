@@ -3,6 +3,8 @@
     <application
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:label="Northbound"
+        android:icon="@drawable/northbound_icon"
+        android:roundIcon="@drawable/northbound_icon"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
